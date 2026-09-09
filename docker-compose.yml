@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    container_name: playhub-pos
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      PORT: 8000
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE:-bsb_playhub}
+      DB_USERNAME: ${DB_USERNAME:-bsb_playhub}
+      DB_PASSWORD: ${DB_PASSWORD:?Isi DB_PASSWORD di file .env terlebih dahulu}
+      JWT_SECRET: ${JWT_SECRET:-playhub-pos-jwt-secret-key-2026}
+      JWT_TTL: ${JWT_TTL:-480}
+      TZ: Asia/Makassar
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/storage/app/public:/app/backend/storage/app/public
+      - ./backend/storage/app/private/backups:/app/backend/storage/app/private/backups

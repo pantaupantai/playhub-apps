@@ -25,6 +25,11 @@ app.use(express.static(publicDir));
 const storageDir = path.join(__dirname, 'backend', 'storage', 'app', 'public');
 app.use('/storage', express.static(storageDir));
 
+// Healthcheck
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', app: 'playhub-pos', time: new Date().toISOString() });
+});
+
 // Helpers
 const getAuthUser = async (req) => {
   const authHeader = req.headers.authorization;
