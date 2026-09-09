@@ -1,0 +1,7 @@
+<svg width="160" height="120" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="160" height="120" rx="12" fill="#0F172A"/>
+  <rect x="18" y="18" width="124" height="84" rx="10" fill="#1E293B"/>
+  <path d="M51 75L70 54L85 68L96 56L119 82H41L51 75Z" fill="#34D399"/>
+  <circle cx="108" cy="40" r="9" fill="#F59E0B"/>
+  <text x="80" y="102" fill="#CBD5E1" font-family="Arial, sans-serif" font-size="11" text-anchor="middle">POS ITEM</text>
+</svg>
