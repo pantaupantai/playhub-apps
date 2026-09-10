@@ -17,5 +17,5 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./backend/storage/app/public:/app/backend/storage/app/public
-      - ./backend/storage/app/private/backups:/app/backend/storage/app/private/backups
+      - ./storage/public:/app/storage/public
+      - ./storage/backups:/app/storage/backups

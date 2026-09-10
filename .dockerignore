@@ -5,15 +5,8 @@ npm-debug.log
 .env
 .env.*
 !.env.example
-backend/vendor
-backend/storage/framework
-backend/storage/logs
 *.log
-error_log
-backend/error_log
 .DS_Store
 Thumbs.db
 .idea
 .vscode
-.well-known
-cgi-bin

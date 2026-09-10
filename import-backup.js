@@ -3,7 +3,7 @@ const path = require('path');
 const pool = require('./db');
 
 async function importBackup() {
-  const backupPath = path.join(__dirname, 'backend/storage/app/private/backups/pos-billing-backup-20260609-172224.sql');
+  const backupPath = path.join(__dirname, 'storage', 'backups', 'pos-billing-backup-20260609-172224.sql');
   if (!fs.existsSync(backupPath)) {
     console.log('No backup file found at', backupPath);
     return;

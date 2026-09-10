@@ -1,7 +1,7 @@
 {
-  "name": "mahjong-pos-server",
+  "name": "playhub-pos",
   "version": "1.0.0",
-  "description": "High-performance Express backend for Mahjong POS Billing",
+  "description": "High-performance Express backend and frontend for Playhub POS Billing",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

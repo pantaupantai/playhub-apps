@@ -18,11 +18,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static frontend files
-const publicDir = path.join(__dirname, 'backend', 'public');
+const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
 
 // Serve storage if uploaded files exist
-const storageDir = path.join(__dirname, 'backend', 'storage', 'app', 'public');
+const storageDir = path.join(__dirname, 'storage', 'public');
 app.use('/storage', express.static(storageDir));
 
 // Healthcheck
