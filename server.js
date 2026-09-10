@@ -17,6 +17,23 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging for Docker logs visibility
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
+// Smart URL rewrite: if request hits /auth, /login, /pos, etc. without /api, route it to /api
+app.use((req, res, next) => {
+  if (!req.url.startsWith('/api') && !req.url.startsWith('/storage') && !req.url.startsWith('/assets')) {
+    const apiPrefixes = ['/auth', '/login', '/pos', '/transactions', '/timers', '/tables', '/shifts', '/categories', '/products', '/users', '/backups', '/health', '/db-check'];
+    if (apiPrefixes.some(p => req.path === p || req.path.startsWith(p + '/'))) {
+      req.url = '/api' + req.url;
+    }
+  }
+  next();
+});
+
 // Serve static frontend files
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
@@ -28,6 +45,50 @@ app.use('/storage', express.static(storageDir));
 // Healthcheck
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'playhub-pos', time: new Date().toISOString() });
+});
+
+// Database connectivity check endpoint
+app.get('/api/db-check', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT 1 as connected, DATABASE() as current_db, USER() as current_user');
+    const [tables] = await pool.query('SHOW TABLES');
+    let userList = [];
+    try {
+      const [u] = await pool.query('SELECT id, username, name, role_id, status FROM users LIMIT 10');
+      userList = u;
+    } catch (e) {}
+
+    res.json({
+      status: 'success',
+      database_connection: 'OK',
+      info: rows[0],
+      total_tables: tables.length,
+      tables: tables.map(t => Object.values(t)[0]),
+      sample_users: userList.map(u => ({ username: u.username, name: u.name, status: u.status })),
+      config: {
+        host: process.env.DB_HOST || '127.0.0.1',
+        port: parseInt(process.env.DB_PORT || '3306', 10),
+        database: process.env.DB_DATABASE || 'bsb_playhub',
+        user: process.env.DB_USERNAME || 'bsb_playhub',
+        password_set: Boolean(process.env.DB_PASSWORD)
+      }
+    });
+  } catch (err) {
+    console.error('DB Check error:', err.message);
+    res.status(500).json({
+      status: 'error',
+      database_connection: 'FAILED',
+      error_message: err.message,
+      error_code: err.code,
+      config: {
+        host: process.env.DB_HOST || '127.0.0.1',
+        port: parseInt(process.env.DB_PORT || '3306', 10),
+        database: process.env.DB_DATABASE || 'bsb_playhub',
+        user: process.env.DB_USERNAME || 'bsb_playhub',
+        password_set: Boolean(process.env.DB_PASSWORD)
+      }
+    });
+  }
 });
 
 // Helpers
@@ -134,79 +195,78 @@ const formatTimerResponse = (tm) => {
 // ROUTES
 // -------------------------------------------------------------
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    app: 'POS BILLING (Express)',
-    time: new Date().toISOString()
-  });
-});
-
 // Auth
-app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(422).json({ message: 'Username atau password wajib diisi.' });
-  }
-
-  const [users] = await pool.query(
-    `SELECT u.*, r.name as role_name, r.description as role_description 
-     FROM users u 
-     JOIN roles r ON u.role_id = r.id 
-     WHERE u.username = ?`,
-    [username]
-  );
-
-  if (!users.length) {
-    return res.status(422).json({ message: 'Username atau password tidak valid.' });
-  }
-
-  const user = users[0];
-  if (user.status !== 'active') {
-    return res.status(422).json({ message: 'Akun nonaktif.' });
-  }
-
-  // Support bcrypt (Laravel uses bcrypt $2y$)
-  let validPassword = false;
+app.post(['/api/auth/login', '/api/login', '/auth/login', '/login'], async (req, res) => {
   try {
-    const formattedHash = user.password.replace(/^\$2y\$/, '$2a$');
-    validPassword = await bcrypt.compare(password, formattedHash);
-  } catch (e) {
-    validPassword = (password === user.password);
-  }
-
-  if (!validPassword) {
-    return res.status(422).json({ message: 'Username atau password tidak valid.' });
-  }
-
-  const token = jwt.sign(
-    { sub: user.id, username: user.username, role: user.role_name },
-    JWT_SECRET,
-    { expiresIn: `${JWT_TTL}m` }
-  );
-
-  const userData = {
-    id: user.id,
-    role_id: user.role_id,
-    name: user.name,
-    username: user.username,
-    status: user.status,
-    role: {
-      id: user.role_id,
-      name: user.role_name,
-      description: user.role_description
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(422).json({ message: 'Username atau password wajib diisi.' });
     }
-  };
 
-  await logActivity(user.id, 'Login', 'Auth', req);
+    const [users] = await pool.query(
+      `SELECT u.*, r.name as role_name, r.description as role_description 
+       FROM users u 
+       JOIN roles r ON u.role_id = r.id 
+       WHERE u.username = ?`,
+      [username]
+    );
 
-  return res.json({
-    access_token: token,
-    token_type: 'bearer',
-    expires_in: JWT_TTL * 60,
-    user: userData
-  });
+    if (!users.length) {
+      return res.status(422).json({ message: 'Username atau password tidak valid.' });
+    }
+
+    const user = users[0];
+    if (user.status !== 'active') {
+      return res.status(422).json({ message: 'Akun nonaktif.' });
+    }
+
+    // Support bcrypt (Laravel uses bcrypt $2y$)
+    let validPassword = false;
+    try {
+      const formattedHash = user.password.replace(/^\$2y\$/, '$2a$');
+      validPassword = await bcrypt.compare(password, formattedHash);
+    } catch (e) {
+      validPassword = (password === user.password);
+    }
+
+    if (!validPassword) {
+      return res.status(422).json({ message: 'Username atau password tidak valid.' });
+    }
+
+    const token = jwt.sign(
+      { sub: user.id, username: user.username, role: user.role_name },
+      JWT_SECRET,
+      { expiresIn: `${JWT_TTL}m` }
+    );
+
+    const userData = {
+      id: user.id,
+      role_id: user.role_id,
+      name: user.name,
+      username: user.username,
+      status: user.status,
+      role: {
+        id: user.role_id,
+        name: user.role_name,
+        description: user.role_description
+      }
+    };
+
+    await logActivity(user.id, 'Login', 'Auth', req);
+
+    return res.json({
+      access_token: token,
+      token_type: 'bearer',
+      expires_in: JWT_TTL * 60,
+      user: userData
+    });
+  } catch (err) {
+    console.error('Database query error on login:', err);
+    return res.status(500).json({
+      message: 'Koneksi database gagal: ' + err.message,
+      error_code: err.code
+    });
+  }
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
